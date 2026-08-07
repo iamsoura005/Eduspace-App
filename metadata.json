@@ -1,0 +1,6 @@
+{
+  "name": "Eduspace",
+  "description": "Comprehensive academic ERP suite featuring biometric security, class management, timetable, library catalog, financial portal, and exam hub.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
