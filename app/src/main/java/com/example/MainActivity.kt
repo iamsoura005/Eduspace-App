@@ -161,6 +161,7 @@ fun MainAppContent(
                         requireBiometricForPayments = requireBiometricForPayments
                     )
                     StudentPortal.SETTINGS -> SettingsScreen(
+                        user = user,
                         securityPreferences = securityPreferences,
                         isBiometricEnabled = isBiometricEnabled,
                         sessionTimeoutMinutes = sessionTimeoutMinutes,

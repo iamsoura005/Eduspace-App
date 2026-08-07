@@ -55,12 +55,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.UserAccount
 import com.example.data.SecurityPreferences
 import com.example.utils.Responsive
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
+    user: UserAccount,
     securityPreferences: SecurityPreferences,
     isBiometricEnabled: Boolean,
     sessionTimeoutMinutes: Int,
@@ -120,14 +122,14 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(16.dp))
 
                     Column {
-                        Text(text = "Alex Johnson", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(text = "alex.johnson@university.edu", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = user.fullName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(text = user.email, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            Text(text = "Student ID: 8841-9201", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            Text(text = "${user.role.label}: ${user.roleSpecificId}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
                 }
