@@ -23,6 +23,23 @@ class SecurityPreferences(private val context: Context) {
         val USER_PIN = stringPreferencesKey("user_pin")
         val LAST_ACTIVE_TIMESTAMP = longPreferencesKey("last_active_timestamp")
         val IS_ENROLLED_DEMO = booleanPreferencesKey("is_enrolled_demo")
+        val LAST_LOGGED_IN_EMAIL = stringPreferencesKey("last_logged_in_email")
+    }
+
+    val lastLoggedInEmail: Flow<String?> = context.securityDataStore.data.map { prefs ->
+        prefs[LAST_LOGGED_IN_EMAIL]
+    }
+
+    suspend fun setLastLoggedInEmail(email: String) {
+        context.securityDataStore.edit { prefs ->
+            prefs[LAST_LOGGED_IN_EMAIL] = email
+        }
+    }
+
+    suspend fun clearLastLoggedInEmail() {
+        context.securityDataStore.edit { prefs ->
+            prefs.remove(LAST_LOGGED_IN_EMAIL)
+        }
     }
 
     val isBiometricEnabled: Flow<Boolean> = context.securityDataStore.data.map { prefs ->
@@ -37,8 +54,8 @@ class SecurityPreferences(private val context: Context) {
         prefs[REQUIRE_BIOMETRIC_FOR_PAYMENTS] ?: true
     }
 
-    val userPin: Flow<String> = context.securityDataStore.data.map { prefs ->
-        prefs[USER_PIN] ?: "1234"
+    val userPin: Flow<String?> = context.securityDataStore.data.map { prefs ->
+        prefs[USER_PIN]
     }
 
     val lastActiveTimestamp: Flow<Long> = context.securityDataStore.data.map { prefs ->

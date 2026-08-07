@@ -28,7 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
@@ -70,13 +70,19 @@ import com.example.utils.Responsive
 fun AuthLockScreen(
     biometricAuthManager: BiometricAuthManager,
     isBiometricEnabled: Boolean,
-    correctPin: String = "1234",
+    correctPin: String? = null,
+    onSetPin: ((String) -> Unit)? = null,
     onUnlocked: () -> Unit
 ) {
     val dimensions = Responsive.dimensions
     val context = LocalContext.current
-    var isPinMode by remember { mutableStateOf(!isBiometricEnabled) }
+    val pinConfigured = !correctPin.isNullOrBlank()
+    val setupPinRequired = !pinConfigured && onSetPin != null
+
+    var isPinMode by remember { mutableStateOf(setupPinRequired || !isBiometricEnabled) }
     var enteredPin by remember { mutableStateOf("") }
+    var isConfirmingNewPin by remember { mutableStateOf(false) }
+    var pendingNewPin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var statusInfo by remember { mutableStateOf("") }
 
@@ -100,15 +106,34 @@ fun AuthLockScreen(
             enteredPin = updated
             errorMessage = null
             if (updated.length == 4) {
-                if (updated == correctPin) {
-                    onUnlocked()
+                if (isConfirmingNewPin) {
+                    if (updated == pendingNewPin) {
+                        onSetPin?.invoke(updated)
+                        onUnlocked()
+                    } else {
+                        errorMessage = "PINs did not match. Try again."
+                        enteredPin = ""
+                        isConfirmingNewPin = false
+                        pendingNewPin = ""
+                    }
+                } else if (pinConfigured) {
+                    if (updated == correctPin) {
+                        onUnlocked()
+                    } else {
+                        errorMessage = "Incorrect Passcode. Try again."
+                        enteredPin = ""
+                    }
                 } else {
-                    errorMessage = "Incorrect Passcode. Try '1234'"
+                    // First entry of a brand-new PIN: ask for confirmation
+                    pendingNewPin = updated
                     enteredPin = ""
+                    isConfirmingNewPin = true
                 }
             }
         }
     }
+
+    fun isSettingUpPin() = setupPinRequired
 
     Box(
         modifier = Modifier
@@ -171,7 +196,9 @@ fun AuthLockScreen(
                 )
 
                 Text(
-                    text = if (isPinMode) "Enter 4-Digit Passcode" else "Biometric Authentication Required",
+                    text = if (isSettingUpPin()) "Create Your 4-Digit Passcode"
+                    else if (isPinMode) (if (isConfirmingNewPin) "Confirm Your 4-Digit Passcode" else "Enter 4-Digit Passcode")
+                    else "Biometric Authentication Required",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -210,7 +237,21 @@ fun AuthLockScreen(
                                 .size(80.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
-                                .clickable { onUnlocked() },
+                                .clickable {
+                                    val lockActivity = context as? androidx.fragment.app.FragmentActivity
+                                    biometricAuthManager.promptBiometricAuth(
+                                        activity = lockActivity ?: return@clickable,
+                                        title = "Unlock Eduspace Session",
+                                        subtitle = "Confirm identity with fingerprint or face",
+                                        onResult = { result ->
+                                            if (result is AuthResult.Success) {
+                                                onUnlocked()
+                                            } else if (result is AuthResult.Error) {
+                                                errorMessage = result.errString
+                                            }
+                                        }
+                                    )
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -240,7 +281,25 @@ fun AuthLockScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
-                        onClick = { onUnlocked() },
+                        onClick = {
+                            if (isSettingUpPin()) {
+                                isPinMode = true
+                            } else {
+                                val lockActivity = context as? androidx.fragment.app.FragmentActivity
+                                biometricAuthManager.promptBiometricAuth(
+                                    activity = lockActivity ?: return@Button,
+                                    title = "Unlock Eduspace Session",
+                                    subtitle = "Confirm identity with fingerprint or face",
+                                    onResult = { result ->
+                                        if (result is AuthResult.Success) {
+                                            onUnlocked()
+                                        } else if (result is AuthResult.Error) {
+                                            errorMessage = result.errString
+                                        }
+                                    }
+                                )
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
@@ -256,7 +315,11 @@ fun AuthLockScreen(
                             contentDescription = null,
                             modifier = Modifier.padding(end = 8.dp)
                         )
-                        Text("AUTHENTICATE SESSION", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text(
+                            text = if (isSettingUpPin()) "SET UP PASSCODE" else "AUTHENTICATE SESSION",
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -362,7 +425,7 @@ fun AuthLockScreen(
                                         ) {
                                             if (key == "Del") {
                                                 Icon(
-                                                    imageVector = Icons.Default.Backspace,
+                                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
                                                     contentDescription = "Delete",
                                                     modifier = Modifier.size(20.dp),
                                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -431,13 +494,21 @@ fun AuthLockScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Quick Demo Unlock Button for frictionless evaluation
-                Text(
-                    text = "Demo PIN: 1234",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.clickable { onUnlocked() }
-                )
+                if (!pinConfigured) {
+                    // First-time hint to set a PIN (removed once a PIN exists)
+                    Text(
+                        text = if (isSettingUpPin()) "First time here? Set your own passcode to secure this device." else "Demo PIN: 1234",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.clickable {
+                            if (isSettingUpPin()) {
+                                isPinMode = true
+                            } else {
+                                onUnlocked()
+                            }
+                        }
+                    )
+                }
             }
         }
     }

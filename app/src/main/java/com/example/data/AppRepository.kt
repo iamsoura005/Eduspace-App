@@ -3,6 +3,7 @@ package com.example.data
 import com.example.auth.ActivityLogItem
 import com.example.auth.AttendanceRecord
 import com.example.auth.AttendanceStatus
+import com.example.auth.PasswordHasher
 import com.example.auth.UserAccount
 import com.example.auth.UserRole
 import com.example.auth.UserStatus
@@ -37,7 +38,7 @@ class AppRepository private constructor() {
                 rollNumber = "CS-2026-042",
                 semester = "Semester 6",
                 status = UserStatus.ACTIVE,
-                passwordHash = "student123"
+                passwordHash = PasswordHasher.hash("student123")
             ),
             UserAccount(
                 id = "U-STU-02",
@@ -50,7 +51,7 @@ class AppRepository private constructor() {
                 rollNumber = "CS-2026-045",
                 semester = "Semester 6",
                 status = UserStatus.ACTIVE,
-                passwordHash = "student123"
+                passwordHash = PasswordHasher.hash("student123")
             ),
             UserAccount(
                 id = "U-STU-03",
@@ -63,7 +64,7 @@ class AppRepository private constructor() {
                 rollNumber = "EE-2026-011",
                 semester = "Semester 4",
                 status = UserStatus.ACTIVE,
-                passwordHash = "student123"
+                passwordHash = PasswordHasher.hash("student123")
             ),
             UserAccount(
                 id = "U-COE-01",
@@ -74,7 +75,7 @@ class AppRepository private constructor() {
                 department = "Controller of Exams Office",
                 roleSpecificId = "COE-EMP-401",
                 status = UserStatus.ACTIVE,
-                passwordHash = "coe123"
+                passwordHash = PasswordHasher.hash("coe123")
             ),
             UserAccount(
                 id = "U-ADM-01",
@@ -85,14 +86,14 @@ class AppRepository private constructor() {
                 department = "IT Infrastructure & Security",
                 roleSpecificId = "ADM-SYS-001",
                 status = UserStatus.ACTIVE,
-                passwordHash = "admin123"
+                passwordHash = PasswordHasher.hash("admin123")
             )
         )
     )
     val users: StateFlow<List<UserAccount>> = _users.asStateFlow()
 
-    // Current Authenticated User State
-    private val _currentUser = MutableStateFlow<UserAccount?>(_users.value.first()) // Default to student
+    // Current Authenticated User State (starts logged out; no silent auto-login)
+    private val _currentUser = MutableStateFlow<UserAccount?>(null)
     val currentUser: StateFlow<UserAccount?> = _currentUser.asStateFlow()
 
     // Attendance Records Store
@@ -206,10 +207,14 @@ class AppRepository private constructor() {
         _currentUser.value = null
     }
 
+    fun findUserByEmail(email: String): UserAccount? {
+        return _users.value.find { it.email.equals(email.trim(), ignoreCase = true) }
+    }
+
     fun authenticate(email: String, password: String, role: UserRole): UserAccount? {
         val found = _users.value.find { 
             it.email.equals(email.trim(), ignoreCase = true) && 
-            it.passwordHash == password &&
+            PasswordHasher.verify(password, it.passwordHash) &&
             it.role == role
         }
         if (found != null && found.status == UserStatus.ACTIVE) {
@@ -223,8 +228,8 @@ class AppRepository private constructor() {
         if (_users.value.any { it.email.equals(newUser.email, ignoreCase = true) || it.roleSpecificId == newUser.roleSpecificId }) {
             return false // duplicate
         }
-        _users.value = _users.value + newUser
-        setCurrentUser(newUser)
+        _users.value = _users.value + newUser.copy(passwordHash = PasswordHasher.hash(newUser.passwordHash))
+        setCurrentUser(newUser.copy(passwordHash = PasswordHasher.hash(newUser.passwordHash)))
         logActivity(newUser, "Account Registration", "New account registered as ${newUser.role.label}.")
         return true
     }
@@ -314,7 +319,7 @@ class AppRepository private constructor() {
     }
 
     fun adminAddUser(newUser: UserAccount, adminUser: UserAccount) {
-        _users.value = _users.value + newUser
+        _users.value = _users.value + newUser.copy(passwordHash = PasswordHasher.hash(newUser.passwordHash))
         logActivity(adminUser, "Admin User Creation", "Admin created new user ${newUser.fullName} (${newUser.role.label}).")
     }
 
@@ -345,7 +350,7 @@ class AppRepository private constructor() {
         _users.value = _users.value.map { u ->
             if (u.id == userId) {
                 logActivity(adminUser, "Password Reset", "Admin reset password for user ${u.fullName}.")
-                u.copy(passwordHash = newPass)
+                u.copy(passwordHash = PasswordHasher.hash(newPass))
             } else u
         }
     }
@@ -364,10 +369,10 @@ class AppRepository private constructor() {
 
     fun changeUserPassword(userId: String, oldPass: String, newPass: String): Boolean {
         val u = _users.value.find { it.id == userId }
-        if (u != null && u.passwordHash == oldPass) {
-            _users.value = _users.value.map { if (it.id == userId) it.copy(passwordHash = newPass) else it }
+        if (u != null && PasswordHasher.verify(oldPass, u.passwordHash)) {
+            _users.value = _users.value.map { if (it.id == userId) it.copy(passwordHash = PasswordHasher.hash(newPass)) else it }
             if (_currentUser.value?.id == userId) {
-                _currentUser.value = _currentUser.value?.copy(passwordHash = newPass)
+                _currentUser.value = _currentUser.value?.copy(passwordHash = PasswordHasher.hash(newPass))
             }
             return true
         }

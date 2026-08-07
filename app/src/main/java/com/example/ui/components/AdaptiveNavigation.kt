@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material.icons.filled.LibraryBooks
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
@@ -59,7 +59,7 @@ val CoeNavDestinations = listOf(
 
 val AdminNavDestinations = listOf(
     NavDestination("admin_dashboard", "Admin Portal", Icons.Default.AdminPanelSettings),
-    NavDestination("logs", "Audit Logs", Icons.Default.ListAlt),
+    NavDestination("logs", "Audit Logs", Icons.AutoMirrored.Filled.ListAlt),
     NavDestination("profile", "Profile", Icons.Default.Person)
 )
 

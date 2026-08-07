@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +20,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -50,8 +51,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.UserAccount
 import com.example.ui.theme.EmeraldSuccess
 import com.example.utils.Responsive
+
+enum class StudentPortal(val label: String) {
+    LIBRARY("Library"),
+    EXAMS("Exams"),
+    FINANCE("Finance"),
+    SETTINGS("Settings")
+}
 
 data class MetricCardData(
     val title: String,
@@ -63,7 +72,9 @@ data class MetricCardData(
 
 @Composable
 fun DashboardScreen(
+    student: UserAccount,
     onNavigateTab: (Int) -> Unit,
+    onOpenPortal: (StudentPortal) -> Unit,
     onLockApp: () -> Unit
 ) {
     val dimensions = Responsive.dimensions
@@ -77,12 +88,34 @@ fun DashboardScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(8.dp))
-            DashboardHeader(onLockApp = onLockApp)
+            DashboardHeader(student = student, onLockApp = onLockApp)
         }
 
         item {
             // Hero Welcome Banner
             HeroAcademicBanner()
+        }
+
+        item {
+            // Quick-access portals for modules that previously had no entry point
+            Text(
+                text = "Academic Portals",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PortalShortcutCard(StudentPortal.LIBRARY, Icons.Default.Book, onOpenPortal)
+                    PortalShortcutCard(StudentPortal.EXAMS, Icons.AutoMirrored.Filled.EventNote, onOpenPortal)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PortalShortcutCard(StudentPortal.FINANCE, Icons.Default.Payments, onOpenPortal)
+                    PortalShortcutCard(StudentPortal.SETTINGS, Icons.Default.Fingerprint, onOpenPortal)
+                }
+            }
         }
 
         item {
@@ -99,7 +132,7 @@ fun DashboardScreen(
             val metrics = listOf(
                 MetricCardData("Current GPA", "3.88 / 4.0", "+0.12 this term", Icons.Default.School, MaterialTheme.colorScheme.primary),
                 MetricCardData("Attendance", "94.2%", "Required: 85.0%", Icons.Default.CheckCircle, EmeraldSuccess),
-                MetricCardData("Upcoming Exams", "3 Scheduled", "Next: CS301 on Mon", Icons.Default.EventNote, MaterialTheme.colorScheme.tertiary),
+                MetricCardData("Upcoming Exams", "3 Scheduled", "Next: CS301 on Mon", Icons.AutoMirrored.Filled.EventNote, MaterialTheme.colorScheme.tertiary),
                 MetricCardData("Fee Balance", "$0.00", "Clear for Fall 2026", Icons.Default.Payments, MaterialTheme.colorScheme.secondary)
             )
 
@@ -166,7 +199,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun DashboardHeader(onLockApp: () -> Unit) {
+private fun DashboardHeader(student: UserAccount, onLockApp: () -> Unit) {
     val dimensions = Responsive.dimensions
 
     Row(
@@ -185,7 +218,7 @@ private fun DashboardHeader(onLockApp: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "JD",
+                    text = student.fullName.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 18.sp
@@ -196,13 +229,13 @@ private fun DashboardHeader(onLockApp: () -> Unit) {
 
             Column {
                 Text(
-                    text = "Welcome, Alex",
+                    text = "Welcome, ${student.fullName.split(" ").firstOrNull() ?: ""}",
                     fontSize = dimensions.responsiveSp(18f),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "B.Sc Computer Science • Term 5",
+                    text = "${student.department} • ${student.semester}",
                     fontSize = dimensions.responsiveSp(12f),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -229,6 +262,50 @@ private fun DashboardHeader(onLockApp: () -> Unit) {
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.PortalShortcutCard(
+    portal: StudentPortal,
+    icon: ImageVector,
+    onOpenPortal: (StudentPortal) -> Unit
+) {
+    val dimensions = Responsive.dimensions
+
+    Card(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(dimensions.cardCornerRadius))
+            .clickable { onOpenPortal(portal) }
+            .testTag("portal_shortcut_${portal.name.lowercase()}"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = portal.label,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -41,6 +42,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -48,6 +50,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,15 +70,30 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.auth.AuthResult
+import com.example.auth.BiometricAuthManager
+import com.example.auth.BiometricStatus
 import com.example.auth.UserAccount
 import com.example.auth.UserRole
 import com.example.data.AppRepository
+import com.example.data.SecurityPreferences
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AuthScreen(
+    securityPreferences: SecurityPreferences,
+    biometricAuthManager: BiometricAuthManager,
     onLoginSuccess: (UserAccount) -> Unit
 ) {
     val repository = AppRepository.instance
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val lastLoggedInEmail by securityPreferences.lastLoggedInEmail.collectAsState(initial = null)
+    val isBiometricEnabled by securityPreferences.isBiometricEnabled.collectAsState(initial = false)
+    val biometricStatus = remember { biometricAuthManager.checkBiometricAvailability() }
 
     var isLoginMode by remember { mutableStateOf(true) }
     var selectedRole by remember { mutableStateOf(UserRole.STUDENT) }
@@ -363,6 +381,13 @@ fun AuthScreen(
                         }
                         val user = repository.authenticate(email, password, selectedRole)
                         if (user != null) {
+                            scope.launch {
+                                if (rememberMe) {
+                                    securityPreferences.setLastLoggedInEmail(user.email)
+                                } else {
+                                    securityPreferences.clearLastLoggedInEmail()
+                                }
+                            }
                             onLoginSuccess(user)
                         } else {
                             errorMessage = "Invalid credentials for ${selectedRole.label}. Check preset emails or signup."
@@ -376,6 +401,50 @@ fun AuthScreen(
                 ) {
                     Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                     Text("LOGIN TO ${selectedRole.name}", fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                }
+
+                // Quick Biometric Sign-In (for the last remembered user)
+                if (lastLoggedInEmail != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val canUseBiometrics = isBiometricEnabled && biometricStatus is BiometricStatus.Ready
+
+                    OutlinedButton(
+                        onClick = {
+val authActivity = context as? androidx.fragment.app.FragmentActivity
+                    biometricAuthManager.promptBiometricAuth(
+                        activity = authActivity ?: return@OutlinedButton,
+                                title = "Biometric Sign-In",
+                                subtitle = "Unlock as ${lastLoggedInEmail}",
+                                onResult = { result ->
+                                    if (result is AuthResult.Success) {
+                                        val lastUser = lastLoggedInEmail?.let { repository.findUserByEmail(it) }
+                                        if (lastUser != null) {
+                                            onLoginSuccess(lastUser)
+                                        } else {
+                                            errorMessage = "Last remembered account is no longer available."
+                                        }
+                                    } else if (result is AuthResult.Error) {
+                                        errorMessage = result.errString
+                                    }
+                                }
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("biometric_login_btn"),
+                        enabled = canUseBiometrics,
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                        Text(
+                            text = if (canUseBiometrics) "SIGN IN WITH BIOMETRICS AS $lastLoggedInEmail"
+                            else "Biometric login unavailable",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -574,6 +643,13 @@ fun AuthScreen(
 
                         val success = repository.registerUser(newUser)
                         if (success) {
+                            scope.launch {
+                                if (rememberMe) {
+                                    securityPreferences.setLastLoggedInEmail(email)
+                                } else {
+                                    securityPreferences.clearLastLoggedInEmail()
+                                }
+                            }
                             onLoginSuccess(newUser)
                         } else {
                             errorMessage = "User with this email or Role ID already exists."

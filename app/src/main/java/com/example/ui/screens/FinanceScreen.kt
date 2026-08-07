@@ -45,10 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.AuthResult
 import com.example.auth.BiometricAuthManager
 import com.example.ui.theme.EmeraldSuccess
 import com.example.utils.Responsive
@@ -59,6 +61,7 @@ fun FinanceScreen(
     requireBiometricForPayments: Boolean
 ) {
     val dimensions = Responsive.dimensions
+    val context = LocalContext.current
     var showPaymentDialog by remember { mutableStateOf(false) }
     var paymentSuccessMessage by remember { mutableStateOf<String?>(null) }
 
@@ -71,6 +74,31 @@ fun FinanceScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(8.dp))
+
+            paymentSuccessMessage?.let { msg ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = EmeraldSuccess.copy(alpha = 0.2f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldSuccess),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldSuccess)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = msg,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Text(
                 text = "Tuition & Financial Portal",
                 style = MaterialTheme.typography.headlineMedium,
@@ -232,8 +260,26 @@ fun FinanceScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        showPaymentDialog = false
-                        paymentSuccessMessage = "Payment authorized successfully via Biometrics!"
+                        if (requireBiometricForPayments) {
+                            // Real biometric gate before authorizing the payment
+                            val financeActivity = context as? androidx.fragment.app.FragmentActivity
+                            biometricAuthManager.promptBiometricAuth(
+                                activity = financeActivity ?: return@Button,
+                                title = "Authorize Tuition Payment",
+                                subtitle = "Confirm identity to authorize $250.00",
+                                onResult = { result ->
+                                    if (result is AuthResult.Success) {
+                                        paymentSuccessMessage = "Payment authorized successfully via Biometrics!"
+                                    } else if (result is AuthResult.Error) {
+                                        paymentSuccessMessage = "Payment declined: ${result.errString}"
+                                    }
+                                }
+                            )
+                            showPaymentDialog = false
+                        } else {
+                            showPaymentDialog = false
+                            paymentSuccessMessage = "Payment authorized successfully!"
+                        }
                     }
                 ) {
                     Text("Authorize $250.00")

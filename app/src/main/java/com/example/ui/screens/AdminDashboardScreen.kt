@@ -74,7 +74,8 @@ import com.example.utils.Responsive
 
 @Composable
 fun AdminDashboardScreen(
-    adminUser: UserAccount
+    adminUser: UserAccount,
+    initialSection: Int = 0
 ) {
     val repository = AppRepository.instance
     val dimensions = Responsive.dimensions
@@ -83,7 +84,7 @@ fun AdminDashboardScreen(
     val logs by repository.activityLogs.collectAsState()
     val attendanceRecords by repository.attendanceRecords.collectAsState()
 
-    var activeTab by remember { mutableIntStateOf(0) } // 0: Users, 1: Activity Logs, 2: Reports
+    var activeTab by remember { mutableIntStateOf(initialSection.coerceIn(0, 2)) } // 0: Users, 1: Activity Logs, 2: Reports
     var searchQuery by remember { mutableStateOf("") }
     var roleFilter by remember { mutableStateOf("ALL") }
 
